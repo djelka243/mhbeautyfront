@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mh_beauty/controllers/closing.dart';
 import 'package:provider/provider.dart';
 import 'package:mh_beauty/routes/appRouter.dart';
 import 'package:mh_beauty/controllers/user.dart';
@@ -13,6 +14,7 @@ void main() async {
   final userController = UserController();
   final productController = ProductController();
   final saleController = SaleController();
+  final closingController = ClosingController();
   final appRouter = AppRouter(userController: userController);
 
   runApp(
@@ -20,7 +22,8 @@ void main() async {
       providers: [
         ChangeNotifierProvider.value(value: userController),
         ChangeNotifierProvider.value(value: productController),
-        ChangeNotifierProvider.value(value: saleController)
+        ChangeNotifierProvider.value(value: saleController),
+        ChangeNotifierProvider.value(value: closingController)
       ],
       child: MyApp(appRouter: appRouter),
     ),

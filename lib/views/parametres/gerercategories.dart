@@ -172,7 +172,14 @@ class _GererCategoriesViewState extends State<GererCategoriesView> {
 		final categories = controller.categories;
 
 		return Scaffold(
-			appBar: AppBar(title: const Text('Gérer les catégories')),
+			appBar: AppBar(
+					title: const Text('Gérer les catégories'),
+				centerTitle: true,
+				elevation: 0,
+				foregroundColor: Theme.of(context).brightness == Brightness.light
+						? Colors.black
+						: Colors.white,
+			),
 			body: _isLoading
 					? const Center(child: CircularProgressIndicator())
 					: categories.isEmpty

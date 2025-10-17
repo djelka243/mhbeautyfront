@@ -185,4 +185,47 @@ class ProductController extends ChangeNotifier {
       return false;
     }
   }
+
+
+
+
+
+  // -------------------- 🔥 GESTION DES NOTIFS --------------------
+
+  // Liste des notifications non lues
+  List<Map<String, dynamic>> get unreadLowStockProducts =>
+      lowStockProducts.where((p) => !isProductRead(p)).toList();
+
+// Nombre de notifications non lues
+  int get unreadLowStockCount => unreadLowStockProducts.length;
+
+
+  bool isProductRead(Map<String, dynamic> product) {
+    final updatedAt = DateTime.tryParse(product['updated_at']?.toString() ?? '');
+    if (updatedAt == null) return true;
+
+    final key = 'notif_read_${product['id']}';
+    final lastReadAt = DateTime.tryParse(_storage.read(key)?.toString() ?? '');
+    return lastReadAt != null && lastReadAt.isAfter(updatedAt);
+  }
+
+  void markProductAsRead(int productId) {
+    final key = 'notif_read_$productId';
+    _storage.write(key, DateTime.now().toIso8601String());
+    notifyListeners();
+  }
+
+  void markAllAsRead() {
+    for (var p in lowStockProducts) {
+      final key = 'notif_read_${p['id']}';
+      _storage.write(key, DateTime.now().toIso8601String());
+    }
+    notifyListeners();
+  }
+
+
+
+
+
+
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:mh_beauty/controllers/sale.dart';
 
@@ -45,11 +46,31 @@ class _NewSaleViewState extends State<NewSaleView> {
   double get _deliveryAmount => !_hasDelivery ? 0.0 : double.tryParse(_deliveryCtrl.text) ?? 0.0;
   double get _amountGiven => double.tryParse(_amountGivenCtrl.text) ?? 0.0;
 
-  double _getTotalWithDelivery(double cartTotal) => cartTotal + _deliveryAmount;
-  double _getChange(double total) {
-    double totalInCurrency = _selectedCurrency == 'CDF' ? total * _exchangeRate : total;
-    return _amountGiven - totalInCurrency;
+  /// Calcule le total (en USD de référence) sans double conversion
+  double _getTotalWithDelivery(double cartTotal) {
+    if (!_hasDelivery) return cartTotal;
+
+    // La livraison est toujours saisie en CDF → convertir en USD avant addition
+    double deliveryUsd = _deliveryAmount / _exchangeRate;
+    return cartTotal + deliveryUsd;
   }
+
+  /// Calcule la monnaie à rendre selon la devise du paiement
+  double _getChange(double totalUsdWithDelivery) {
+    double totalInPaymentCurrency;
+
+    if (_selectedCurrency == 'CDF') {
+      // Total converti en CDF
+      totalInPaymentCurrency = totalUsdWithDelivery * _exchangeRate;
+    } else {
+      // Paiement en USD
+      totalInPaymentCurrency = totalUsdWithDelivery;
+    }
+
+    return _amountGiven - totalInPaymentCurrency;
+  }
+  
+
 
   @override
   Widget build(BuildContext context) {
@@ -280,7 +301,7 @@ class _NewSaleViewState extends State<NewSaleView> {
             margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.grey.shade50,
+             // color: Colors.grey.shade50,
               borderRadius: BorderRadius.circular(10),
               border: Border.all(color: Colors.grey.shade200),
             ),
@@ -294,12 +315,13 @@ class _NewSaleViewState extends State<NewSaleView> {
                       Text(
                         name,
                         style: const TextStyle(
-                            fontWeight: FontWeight.w600, fontSize: 15),
+                          color: Colors.black,
+                            fontWeight: FontWeight.w900, fontSize: 15),
                       ),
                       const SizedBox(height: 2),
                       Text('\$${price.toStringAsFixed(2)}',
                           style: TextStyle(
-                              color: Colors.grey.shade600, fontSize: 13)),
+                              color: Colors.grey.shade900, fontSize: 13)),
                     ],
                   ),
                 ),
@@ -389,13 +411,13 @@ class _NewSaleViewState extends State<NewSaleView> {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+       // crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // --- Sous-total ---
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.blueGrey.shade50,
+             // color: Colors.blueGrey.shade50,
               borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
@@ -489,26 +511,62 @@ class _NewSaleViewState extends State<NewSaleView> {
 
 // Carte d'affichage du rendu/insuffisance
   Widget _buildChangeCard(double change) {
+    // Conversion dans les deux devises
+    double changeUsd, changeCdf;
+
+    if (_selectedCurrency == "USD") {
+      changeUsd = change;
+      changeCdf = change * _exchangeRate;
+    } else {
+      changeCdf = change;
+      changeUsd = change / _exchangeRate;
+    }
+
+    final isPositive = change >= 0;
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: change >= 0 ? Colors.green.shade50 : Colors.red.shade50,
+        color: isPositive ? Colors.green.shade50 : Colors.red.shade50,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: change >= 0 ? Colors.green.shade200 : Colors.red.shade200,
+          color: isPositive ? Colors.green.shade200 : Colors.red.shade200,
         ),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(change >= 0 ? "Monnaie à rendre" : "Montant insuffisant",
-              style: const TextStyle(fontWeight: FontWeight.w600)),
+          // Libellé
           Text(
-            "${change.abs().toStringAsFixed(2)} $_selectedCurrency",
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: change >= 0 ? Colors.green : Colors.red,
-            ),
+            isPositive ? "Monnaie à rendre" : "Montant insuffisant",
+            style: const TextStyle(fontWeight: FontWeight.w600),
+          ),
+
+          // Montants (alignés à droite)
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                "${change.abs().toStringAsFixed(2)} $_selectedCurrency",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: isPositive ? Colors.green : Colors.red,
+                ),
+              ),
+              if (isPositive)
+                Text(
+                  _selectedCurrency == "USD"
+                      ? "≈ ${changeCdf.toStringAsFixed(0)} CDF"
+                      : "≈ \$${changeUsd.toStringAsFixed(2)}",
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: Colors.grey.shade700,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+            ],
           ),
         ],
       ),
@@ -549,14 +607,45 @@ class _NewSaleViewState extends State<NewSaleView> {
 
   // ÉTAPE 4 : RÉSUMÉ (avec prix unitaire + sous-total)
   Widget _buildStepSummary(SaleController sc, double totalWithDelivery, double change) {
+    // totalWithDelivery est TOUJOURS en USD (c'est votre référence)
+    final totalUsd = totalWithDelivery;
+    final totalCdf = totalWithDelivery * _exchangeRate;
+
+    // Frais de livraison
+    final deliveryUsd = _hasDelivery ? (_deliveryAmount / _exchangeRate) : 0.0;
+    final deliveryCdf = _hasDelivery ? _deliveryAmount : 0.0;
+
+    // Monnaie à rendre (change est déjà calculé dans la devise de paiement)
+    double changeUsd, changeCdf;
+    if (_selectedCurrency == "USD") {
+      changeUsd = change;
+      changeCdf = change * _exchangeRate;
+    } else {
+      changeCdf = change;
+      changeUsd = change / _exchangeRate;
+    }
+
+    // Montant donné converti
+    double amountGivenUsd, amountGivenCdf;
+    if (_selectedCurrency == "USD") {
+      amountGivenUsd = _amountGiven;
+      amountGivenCdf = _amountGiven * _exchangeRate;
+    } else {
+      amountGivenCdf = _amountGiven;
+      amountGivenUsd = _amountGiven / _exchangeRate;
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: ListView(
         children: [
-          const Text("Résumé de la vente",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text(
+            "Résumé de la vente",
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const Divider(),
 
+          // Liste des produits
           ...sc.cart.map((item) {
             final name = item['name'] ?? 'Produit';
             final qty = int.tryParse(item['quantity'].toString()) ?? 0;
@@ -572,49 +661,168 @@ class _NewSaleViewState extends State<NewSaleView> {
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(name,
-                            style: const TextStyle(
-                                fontWeight: FontWeight.w600, fontSize: 16)),
-                        Text("$qty × \$${price.toStringAsFixed(2)}",
-                            style: TextStyle(color: Colors.grey.shade600)),
-                      ],
+                    child: Text(
+                      "$name  × $qty",
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
                     ),
                   ),
-                  Text("\$${subtotal.toStringAsFixed(2)}",
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  Text(
+                    "\$${subtotal.toStringAsFixed(2)}",
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                 ],
               ),
             );
           }),
 
           const Divider(),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text("Total (USD)",
-                style: TextStyle(fontWeight: FontWeight.bold)),
-            Text("\$${totalWithDelivery.toStringAsFixed(2)}"),
-          ]),
-          const SizedBox(height: 4),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text("Total équiv. (CDF)",
-                style: TextStyle(color: Colors.grey)),
-            Text("${(totalWithDelivery * _exchangeRate).toStringAsFixed(0)} CDF"),
-          ]),
-          if (_hasDelivery)
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text("Livraison"),
-              Text("${_deliveryAmount.toStringAsFixed(0)} CDF"),
-            ]),
+
+          // Détails financiers
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Sous-total", style: TextStyle(fontWeight: FontWeight.w600)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text("\$${sc.total.toStringAsFixed(2)}"),
+                  Text("≈ ${(sc.total * _exchangeRate).toStringAsFixed(0)} CDF",
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                ],
+              ),
+            ],
+          ),
+
+          if (_hasDelivery) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Frais de livraison",
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text("\$${deliveryUsd.toStringAsFixed(2)}"),
+                    Text("≈ ${deliveryCdf.toStringAsFixed(0)} CDF",
+                        style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
+                  ],
+                ),
+              ],
+            ),
+          ],
+
+          const SizedBox(height: 6),
+
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Total à payer",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    _selectedCurrency == "USD"
+                        ? "\$${totalUsd.toStringAsFixed(2)}"
+                        : "${totalCdf.toStringAsFixed(0)} CDF", // affiche correctement CDF
+                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  Text(
+                    _selectedCurrency == "CDF"
+                        ? "≈ \$${totalUsd.toStringAsFixed(2)}" // version USD en "≈"
+                        : "≈ ${totalCdf.toStringAsFixed(0)} CDF",
+                    style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
+            ],
+          ),
+
+          const Divider(height: 24),
+
+          // Montant donné
           if (_amountGiven > 0)
-            Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-              const Text("Monnaie"),
-              Text("${change.abs().toStringAsFixed(2)} $_selectedCurrency"),
-            ]),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Montant donné"),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text("${_amountGiven.toStringAsFixed(2)} $_selectedCurrency"),
+                    Text(
+                      _selectedCurrency == "USD"
+                          ? "≈ ${( _amountGiven * _exchangeRate ).toStringAsFixed(0)} CDF"
+                          : "≈ \$${( _amountGiven / _exchangeRate ).toStringAsFixed(2)}",
+                      style: TextStyle(fontSize: 13, color: Colors.grey.shade600),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+          const SizedBox(height: 6),
+
+          // Monnaie à rendre
+          if (_amountGiven > 0)
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Monnaie à rendre",
+                    style: TextStyle(fontWeight: FontWeight.w600)),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      "${change.abs().toStringAsFixed(2)} $_selectedCurrency",
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: change >= 0 ? Colors.green : Colors.red,
+                      ),
+                    ),
+                    Text(
+                      _selectedCurrency == "USD"
+                          ? "≈ ${changeCdf.abs().toStringAsFixed(0)} CDF"
+                          : "≈ \$${changeUsd.abs().toStringAsFixed(2)}",
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey.shade700,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+
+          const SizedBox(height: 12),
+          const Divider(),
+
+          // Détails supplémentaires
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Devise du paiement"),
+              Text(_selectedCurrency,
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text("Taux d’échange"),
+              Text("1 USD = ${_exchangeRate.toStringAsFixed(0)} CDF",
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ],
+          ),
         ],
       ),
     );
@@ -631,9 +839,20 @@ class _NewSaleViewState extends State<NewSaleView> {
     );
 
     if (resp['success'] == true) {
+      // 🔍 Vérifions toutes les possibilités d'où peut se trouver l'ID
+      final data = resp['data'];
+      String? saleId;
+
+      if (data is Map) {
+        saleId = data['id']?.toString() ??
+            data['sale']?['id']?.toString() ??
+            data['data']?['id']?.toString();
+      }
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Vente enregistrée avec succès')),
       );
+
       setState(() {
         _currentStep = 0;
         _clientCtrl.clear();
@@ -641,11 +860,19 @@ class _NewSaleViewState extends State<NewSaleView> {
         _deliveryCtrl.clear();
         _amountGivenCtrl.clear();
         _hasDelivery = false;
-      //  sc.clearCart();
+        // sc.clearCart();
       });
+      if (context.mounted && saleId != null) {
+        context.push('/sales/$saleId');
+      } else {
+        debugPrint('⚠️ Impossible de trouver saleId dans la réponse: $data');
+      }
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(resp['message'] ?? 'Erreur'), backgroundColor: Colors.red),
+        SnackBar(
+          content: Text(resp['message'] ?? 'Erreur lors de l’enregistrement'),
+          backgroundColor: Colors.red,
+        ),
       );
     }
   }

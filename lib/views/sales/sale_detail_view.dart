@@ -67,11 +67,11 @@ class _SaleDetailViewState extends State<SaleDetailView> {
       return double.tryParse(value.toString()) ?? 0.0;
     }
 
+    // ===== DONNÉES DE LA VENTE =====
     final items = (sale!['products'] as List?) ?? [];
-    final total = (sale!['total'] as num?)?.toDouble() ?? 0.0;
-    final subtotal = (sale!['subtotal'] as num?)?.toDouble() ?? 0.0;
-    final delivery = (sale!['delivery'] as num?)?.toDouble() ?? 0.0;
-
+    final subtotal = parseDouble(sale!['subtotal']);
+    final total = parseDouble(sale!['total']);
+    final deliveryUsd = parseDouble(sale!['delivery']); // Stocké en USD dans la BD
 
     final client = (sale!['client'] ?? 'Client inconnu').toString();
     final phone = (sale!['phone'] ?? '-').toString();
@@ -79,12 +79,25 @@ class _SaleDetailViewState extends State<SaleDetailView> {
     final status = (sale!['status'] ?? 'En attente').toString();
     final date = (sale!['date'] ?? sale!['created_at']).toString();
 
+    // ===== INFORMATIONS DE PAIEMENT =====
     final currency = (sale!['currency'] ?? 'USD').toString();
     final exchangeRate = parseDouble(sale!['exchange']);
-    final amountGiven = parseDouble(sale!['amount']);
-    final changeReturned = parseDouble(sale!['returned']);
+    final amountGiven = parseDouble(sale!['amount']); // Dans la devise de paiement
+    final changeReturned = parseDouble(sale!['returned']); // Dans la devise de paiement
 
+    // ===== CONVERSIONS =====
+    // Livraison : toujours stockée en USD, on convertit si nécessaire
+    final deliveryCdf = deliveryUsd * exchangeRate;
 
+    // Sous-total des produits (sans livraison ni taxe)
+    double productSubtotal = 0.0;
+    for (var item in items) {
+      final qty = item['quantity'] ?? 0;
+      final unitPrice = parseDouble(item['unit_price']);
+      productSubtotal += qty * unitPrice;
+    }
+
+    // Date formatée
     DateTime parsedDate;
     try {
       parsedDate = DateTime.parse(date).toLocal();
@@ -92,11 +105,6 @@ class _SaleDetailViewState extends State<SaleDetailView> {
       parsedDate = DateTime.now();
     }
     final formattedDate = DateFormat('dd/MM/yyyy – HH:mm').format(parsedDate);
-
-
-    // Formatage de la date et heure locale
-   /* final formattedDate = DateFormat('dd/MM/yyyy – HH:mm')
-        .format(DateTime.parse(date).toLocal());*/
 
     return Scaffold(
       appBar: AppBar(
@@ -152,17 +160,34 @@ class _SaleDetailViewState extends State<SaleDetailView> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Informations de paiement',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(fontWeight: FontWeight.bold)),
+                    Text(
+                      'Informations de paiement',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleLarge
+                          ?.copyWith(fontWeight: FontWeight.bold),
+                    ),
                     const SizedBox(height: 8),
                     _infoRow('Devise', currency),
-                    _infoRow('Taux de change', exchangeRate.toStringAsFixed(2)),
-                    _infoRow('Montant donné', '${amountGiven.toStringAsFixed(2)} $currency'),
-                    _infoRow('Monnaie rendue', '${changeReturned.toStringAsFixed(2)} $currency'),
-                    _infoRow('Frais de livraison', '${delivery.toStringAsFixed(2)} Fc'),
+                    _infoRow(
+                      'Taux de change',
+                      '1 USD = ${exchangeRate.toStringAsFixed(0)} CDF',
+                    ),
+                    if (amountGiven > 0) ...[
+                      _infoRow(
+                        'Montant donné',
+                        currency == 'USD'
+                            ? '\$${amountGiven.toStringAsFixed(2)}'
+                            : '${amountGiven.toStringAsFixed(0)} FC',
+                      ),
+                      _infoRow(
+                        'Monnaie rendue',
+                        currency == 'USD'
+                            ? '\$${changeReturned.toStringAsFixed(2)}'
+                            : '${changeReturned.toStringAsFixed(0)} FC',
+                        valueColor: changeReturned >= 0 ? Colors.green : Colors.red,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -175,9 +200,10 @@ class _SaleDetailViewState extends State<SaleDetailView> {
             const SizedBox(height: 12),
 
             ...items.map((item) {
-              final qty = item['quantity'];
-              final unit = (item['unit_price'] ?? 0).toDouble();
-              final subtotalItem = qty * unit;
+              final qty = item['quantity'] ?? 0;
+              final unitPrice = parseDouble(item['unit_price']);
+              final itemSubtotal = qty * unitPrice;
+
               return Card(
                 margin: const EdgeInsets.only(bottom: 8),
                 child: Padding(
@@ -198,15 +224,17 @@ class _SaleDetailViewState extends State<SaleDetailView> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(item['name'] ?? '',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold)),
+                            Text(
+                              item['name'] ?? '',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium
+                                  ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
                             const SizedBox(height: 4),
-                            Text('Prix unitaire : ${unit.toStringAsFixed(2)} \$'),
+                            Text('Prix unitaire : \$${unitPrice.toStringAsFixed(2)}'),
                             Text('Quantité : $qty'),
-                            Text('Sous-total : ${subtotalItem.toStringAsFixed(2)} \$'),
+                            Text('Sous-total : \$${itemSubtotal.toStringAsFixed(2)}'),
                           ],
                         ),
                       ),
@@ -226,15 +254,38 @@ class _SaleDetailViewState extends State<SaleDetailView> {
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   children: [
-                    _summaryRow('Sous-total', '${subtotal.toStringAsFixed(2)} \$'),
-                    if (delivery > 0)
-                      _summaryRow('Livraison', '${delivery.toStringAsFixed(2)} Fc'),
+                    _summaryRow(
+                      'Sous-total produits',
+                      '\$${productSubtotal.toStringAsFixed(2)}',
+                    ),
+                    if (deliveryUsd > 0) ...[
+                      _summaryRow(
+                        'Livraison',
+                        currency == 'USD'
+                            ? '\$${deliveryUsd.toStringAsFixed(2)}'
+                            : '${deliveryCdf.toStringAsFixed(0)} FC',
+                      ),
+                      _summaryRow(
+                        'Livraison (équivalent)',
+                        currency == 'USD'
+                            ? '≈ ${deliveryCdf.toStringAsFixed(0)} FC'
+                            : '≈ \$${deliveryUsd.toStringAsFixed(2)}',
+                        isSecondary: true,
+                      ),
+                    ],
                     const Divider(height: 24),
                     _summaryRow(
-                      'Total TTC',
-                      '${total.toStringAsFixed(2)} \$',
+                      'TOTAL PAYÉ',
+                      '\$${total.toStringAsFixed(2)}',
                       isBold: true,
                     ),
+                   /* _summaryRow(
+                      'Total en ${currency == 'USD' ? 'CDF' : 'USD'}',
+                      currency == 'USD'
+                          ? '≈ ${(total * exchangeRate).toStringAsFixed(0)} FC'
+                          : '≈ \$${(total / exchangeRate).toStringAsFixed(2)}',
+                      isSecondary: true,
+                    ),*/
                   ],
                 ),
               ),
@@ -260,15 +311,13 @@ class _SaleDetailViewState extends State<SaleDetailView> {
     );
   }
 
-  // 🔹 Ligne d'information simple
   Widget _infoRow(String label, String value, {Color? valueColor}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label,
-              style: const TextStyle(fontWeight: FontWeight.w500)),
+          Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
           Flexible(
             child: Text(
               value,
@@ -283,18 +332,27 @@ class _SaleDetailViewState extends State<SaleDetailView> {
     );
   }
 
-  // 🔹 Ligne pour le résumé total
-  Widget _summaryRow(String label, String value, {bool isBold = false}) {
+  Widget _summaryRow(String label, String value,
+      {bool isBold = false, bool isSecondary = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
+          Text(
+            label,
+            style: TextStyle(
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: isSecondary ? Colors.grey.shade600 : null,
+              fontSize: isSecondary ? 13 : 14,
+            ),
+          ),
           Text(
             value,
             style: TextStyle(
               fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
+              color: isSecondary ? Colors.grey.shade600 : null,
+              fontSize: isSecondary ? 13 : 14,
             ),
           ),
         ],

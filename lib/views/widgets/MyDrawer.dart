@@ -33,12 +33,12 @@ class _MyDrawerState extends State<MyDrawer> {
                 color: Theme.of(context).colorScheme.primary,
               ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   CircleAvatar(
-                    radius: 30,
-                    child: Icon(Icons.person, size: 30),
+                    radius: 35,
+                    child: Icon(Icons.person, size: 60),
                   ),
                   const SizedBox(height: 10),
                   Text(

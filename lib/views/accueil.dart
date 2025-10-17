@@ -1,7 +1,9 @@
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mh_beauty/controllers/product.dart';
 import 'package:mh_beauty/controllers/sale.dart';
+import 'package:mh_beauty/utils.dart';
 import 'package:mh_beauty/views/widgets/MyDrawer.dart';
 import 'package:provider/provider.dart';
 import 'package:mh_beauty/controllers/user.dart';
@@ -15,19 +17,19 @@ class HomeView extends StatefulWidget {
 
 class _HomeViewState extends State<HomeView> {
   int _selectedIndex = 0;
+  bool _isClosed = false;
+  late DateTime _lastClosingDate;
 
   @override
   void initState() {
     super.initState();
-    // Fetch initial data
-    // Use addPostFrameCallback to ensure context is available
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshData();
+    //  _checkClosingStatus();
     });
   }
 
   Future<void> _refreshData() async {
-    // Utiliser listen: false dans initState pour éviter les rebuilds inutiles
     final productCtrl = Provider.of<ProductController>(context, listen: false);
     final saleCtrl = Provider.of<SaleController>(context, listen: false);
 
@@ -36,11 +38,11 @@ class _HomeViewState extends State<HomeView> {
       productCtrl.fetchCategories(),
       saleCtrl.fetchSalesHistory(),
     ]);
+    //_checkClosingStatus(); // Also check on refresh
   }
 
   @override
   Widget build(BuildContext context) {
-    // Get controllers from Provider
     final userCtrl = Provider.of<UserController>(context);
     final productCtrl = Provider.of<ProductController>(context);
     final saleCtrl = Provider.of<SaleController>(context);
@@ -57,12 +59,14 @@ class _HomeViewState extends State<HomeView> {
           ),
           IconButton(
             icon: Badge(
-              label: Text(lowStockCount.toString()),
-              isLabelVisible: lowStockCount > 0,
+              label: Text(productCtrl.unreadLowStockCount.toString()),
+              isLabelVisible: productCtrl.unreadLowStockCount > 0,
               child: const Icon(Icons.notifications_outlined),
             ),
             onPressed: () => context.push('/notifications'),
           ),
+
+
         ],
       ),
       drawer: MyDrawer(),
@@ -97,29 +101,26 @@ class _HomeViewState extends State<HomeView> {
                   color: Colors.green,
                   onTap: () => context.push('/sales/history'),
                 ),
-                _DashboardCard(
-                  title: 'Catégories',
-                  value: productCtrl.categories.length.toString(),
-                  icon: Icons.category,
-                  color: Colors.orange,
-                  onTap: () => context.push('/products'), // Or a dedicated categories page
-                ),
                 if (isAdmin)
                   _DashboardCard(
-                    title: 'Utilisateurs',
-                    value: 'N/A', // Placeholder, needs a way to get user count
-                    icon: Icons.people,
-                    color: Colors.purple,
-                    onTap: () => context.push('/users'), // Assuming a /users route
-                  )
-                else
-                  _DashboardCard(
-                    title: 'Mon Compte',
-                    value: '',
-                    icon: Icons.person,
-                    color: Colors.purple,
-                    onTap: () => context.push('/profile'), // Assuming a /profile route
+                    title: 'Catégories',
+                    value: productCtrl.categories.length.toString(),
+                    icon: Icons.category,
+                    color: Colors.orange,
+                    onTap: () => context.push('/products'),
                   ),
+                if (isAdmin)
+                _DashboardCard(
+                  title: 'Clients',
+                  value: 'N/A',
+                  icon: Icons.people,
+                  color: Colors.red,
+                  onTap: () => Utils.afficherSnack(
+                    context,
+                    'La gestion des clients sera disponible dans une future mise à jour.',
+                      Colors.black
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 24),
@@ -133,10 +134,20 @@ class _HomeViewState extends State<HomeView> {
                 leading: const Icon(Icons.add_shopping_cart),
                 title: const Text('Nouvelle vente'),
                 trailing: const Icon(Icons.arrow_forward_ios),
-                onTap: () => context.push('/sales/new'),
+                onTap: _isClosed
+                    ? () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('La caisse est fermée pour aujourd\'hui.'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                      }
+                    : () => context.push('/sales/new'),
               ),
             ),
-            const SizedBox(height: 8),
+            if (isAdmin)
+              const SizedBox(height: 8),
             if (isAdmin)
               Card(
                 child: ListTile(
@@ -146,38 +157,58 @@ class _HomeViewState extends State<HomeView> {
                   onTap: () => context.push('/products/add'),
                 ),
               ),
-            const SizedBox(height: 8),
-            Card(
-              child: ListTile(
-                leading: const Icon(Icons.history),
-                title: const Text('Historique des ventes'),
-                trailing: const Icon(Icons.arrow_forward_ios),
-                onTap: () => context.push('/sales/history'),
-              ),
-            ),
             if (isAdmin)
               const SizedBox(height: 8),
-            if (isAdmin)
               Card(
                 child: ListTile(
-                  leading: const Icon(Icons.settings),
-                  title: const Text('Paramètres'),
+                  leading: const Icon(Icons.category_outlined),
+                  title: const Text('Ajouter une catégorie'),
                   trailing: const Icon(Icons.arrow_forward_ios),
-                  onTap: () => context.push('/settings'), // Assuming a /settings route
+                  onTap: () => context.push('/settings/categories'),
                 ),
               ),
+            if (isAdmin)
+              const SizedBox(height: 8),
+              Card(
+                child: ListTile(
+                  leading: const Icon(Icons.money_off),
+                  title: const Text('Configurer le taux'),
+                  trailing: const Icon(Icons.arrow_forward_ios),
+                  onTap: () => context.push('/settings/pricing'),
+                ),
+              ),
+            const SizedBox(height: 8),
+            Card(
+              color: Colors.redAccent,
+              child: ListTile(
+                leading: const Icon(Icons.close, color: Colors.white),
+                title: const Text('Cloturer la caisse',
+                    style: TextStyle(color: Colors.white)),
+                trailing:
+                    const Icon(Icons.arrow_forward_ios, color: Colors.white),
+                onTap: () => context.push('/cloture'),
+              ),
+            ),
           ],
         ),
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _selectedIndex,
         onDestinationSelected: (index) {
+          if (_isClosed && index == 2) {
+             ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('La caisse est fermée pour aujourd\'hui.'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            return;
+          }
           setState(() {
             _selectedIndex = index;
           });
           switch (index) {
             case 0:
-            // Already on home, do nothing or context.go('/home');
               break;
             case 1:
               context.push('/products');
@@ -249,8 +280,8 @@ class _DashboardCard extends StatelessWidget {
               Text(
                 value,
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+                      fontWeight: FontWeight.bold,
+                    ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 4),

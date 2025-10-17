@@ -170,7 +170,6 @@ class _SalesHistoryViewState extends State<SalesHistoryView> {
                         : 'Client inconnu';
                     final total =
                     (sale['total'] ?? 0).toStringAsFixed(2);
-                    // ✅ Calcul du nombre d'articles à partir de la liste 'products'
                     final itemsCount = (sale['products'] as List?)?.length ?? 0;
 
 

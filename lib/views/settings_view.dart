@@ -16,6 +16,8 @@ class _SettingsViewState extends State<SettingsView> {
 
   @override
   Widget build(BuildContext context) {
+    final userCtrl = Provider.of<UserController>(context);
+    final bool isAdmin = userCtrl.isAdmin;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Paramètres'),
@@ -23,45 +25,7 @@ class _SettingsViewState extends State<SettingsView> {
       body: ListView(
         children: [
           const SizedBox(height: 16),
-          Center(
-            child: Column(
-              children: [
-                Stack(
-                  children: [
-                    const CircleAvatar(
-                      radius: 50,
-                      child: Icon(Icons.person, size: 50),
-                    ),
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: CircleAvatar(
-                        radius: 18,
-                        backgroundColor: Theme.of(context).colorScheme.primary,
-                        child: IconButton(
-                          icon: const Icon(Icons.edit, size: 16, color: Colors.white),
-                          onPressed: () {},
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  'Jessy Djonga',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'contact@jessydjonga.site',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
+
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Text(
@@ -84,7 +48,9 @@ class _SettingsViewState extends State<SettingsView> {
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () => context.push('/settings/change-password'),
           ),
+          if (isAdmin)
           const Divider(),
+          if (isAdmin)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Text(
@@ -94,24 +60,28 @@ class _SettingsViewState extends State<SettingsView> {
               ),
             ),
           ),
+          if (isAdmin)
           ListTile(
             leading: const Icon(Icons.store_outlined),
             title: const Text('Informations du magasin'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () => context.push('/settings/info-magasin'),
           ),
+          if (isAdmin)
           ListTile(
             leading: const Icon(Icons.category_outlined),
             title: const Text('Gérer les catégories'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () => context.push('/settings/categories'),
           ),
+          if (isAdmin)
           ListTile(
             leading: const Icon(Icons.money_off),
             title: const Text('Configuration du taux'),
             trailing: const Icon(Icons.arrow_forward_ios, size: 16),
             onTap: () => context.push('/settings/pricing'),
           ),
+
           const Divider(),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

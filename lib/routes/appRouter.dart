@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:mh_beauty/views/cloture_view.dart';
 import 'package:mh_beauty/views/notifications.dart';
 import 'package:provider/provider.dart';
 import '../controllers/sale.dart';
@@ -119,6 +120,10 @@ class AppRouter {
       GoRoute(
         path: '/notifications',
         builder: (context, state) => const NotificationsView(),
+      ),
+      GoRoute(
+        path: '/cloture',
+        builder: (context, state) => const ClotureView(),
       ),
     ],
     redirect: (BuildContext context, GoRouterState state) {

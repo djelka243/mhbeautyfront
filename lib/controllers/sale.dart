@@ -351,31 +351,35 @@ class SaleController extends ChangeNotifier {
     try {
       final url = Uri.parse('${UserController.apiBaseUrl}/sales');
 
-      final items =
-          cart.map((c) {
-            final rawId = c['id'];
-            final intId =
-                rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
-            return {'product_id': intId ?? rawId, 'quantity': c['quantity']};
-          }).toList();
+      final items = cart.map((c) {
+        final rawId = c['id'];
+        final intId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
+        return {
+          'product_id': intId ?? rawId,
+          'quantity': c['quantity'],
+        };
+      }).toList();
+
+      // ✅ La livraison est TOUJOURS saisie en CDF dans l'app
+      // On la convertit en USD pour l'envoyer au backend
+      double deliveryInUsd = 0.0;
+      if (deliveryFee != null && deliveryFee > 0) {
+        deliveryInUsd = deliveryFee / (exchangeRate ?? 1);
+      }
 
       final body = jsonEncode({
-        if (clientName != null && clientName.isNotEmpty)
-          'customer_name': clientName,
+        if (clientName != null && clientName.isNotEmpty) 'customer_name': clientName,
+        if (clientPhone != null && clientPhone.isNotEmpty) 'customer_phone': clientPhone,
         'products': items,
-        if (deliveryFee != null && deliveryFee > 0) 'delivery_fee': deliveryFee,
+        if (deliveryInUsd > 0) 'delivery_fee': deliveryInUsd,
         if (currency != null) 'payment_currency': currency,
         if (amountGiven != null && amountGiven > 0) 'amount_given': amountGiven,
         if (exchangeRate != null) 'exchange_rate': exchangeRate,
-        if (clientPhone != null && clientPhone.isNotEmpty)
-          'customer_phone': clientPhone,
       });
 
       debugPrint('submitSale request -> $url, body: $body');
       final resp = await http.post(url, headers: getAuthHeaders(), body: body);
-      debugPrint(
-        'submitSale response -> status: ${resp.statusCode}, body: ${resp.body}',
-      );
+      debugPrint('submitSale response -> status: ${resp.statusCode}, body: ${resp.body}');
 
       final js = resp.body.isNotEmpty ? jsonDecode(resp.body) : {};
 
@@ -383,23 +387,33 @@ class SaleController extends ChangeNotifier {
         // Vider le panier après succès
         cart.clear();
         searchResults.clear();
-
-        // Mettre à jour l'historique des ventes
-        await fetchSalesHistory();
-
         notifyListeners();
         return {'success': true, 'data': js};
       }
 
+      // Gérer spécifiquement l'erreur de caisse clôturée
+      if (resp.statusCode == 403) {
+        return {
+          'success': false,
+          'message': js is Map
+              ? (js['message'] ?? 'La caisse a été clôturée. Ventes suspendues jusqu\'à demain.')
+              : 'La caisse a été clôturée. Ventes suspendues jusqu\'à demain.',
+          'is_closed': true,
+        };
+      }
+
       return {
         'success': false,
-        'message': js is Map ? (js['message'] ?? resp.body) : resp.body,
+        'message': js is Map ? (js['message'] ?? resp.body) : resp.body
       };
     } catch (e) {
       debugPrint('submitSale exception: $e');
       return {'success': false, 'message': 'Erreur réseau: $e'};
     }
   }
+
+
+
 
   void increaseQuantity(dynamic productId) {
     final index = cart.indexWhere((item) => item['id'] == productId);

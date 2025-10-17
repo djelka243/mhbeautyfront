@@ -83,8 +83,10 @@ class _ConfigPrixViewState extends State<ConfigPrixView> {
 			appBar: AppBar(
 				title: const Text('Taux du jour'),
 				centerTitle: true,
-				backgroundColor: Theme.of(context).appBarTheme.backgroundColor ?? Colors.white,
 				elevation: 0,
+				foregroundColor: Theme.of(context).brightness == Brightness.light
+						? Colors.black
+						: Colors.white,
 			),
 			body: SingleChildScrollView(
 					padding: const EdgeInsets.all(20),
