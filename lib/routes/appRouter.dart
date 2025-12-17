@@ -125,6 +125,7 @@ class AppRouter {
         path: '/cloture',
         builder: (context, state) => const ClotureView(),
       ),
+
     ],
     redirect: (BuildContext context, GoRouterState state) {
       final bool loggedIn = userController.isAuthenticated;

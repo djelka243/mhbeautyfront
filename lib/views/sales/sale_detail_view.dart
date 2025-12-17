@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../../controllers/sale.dart';
@@ -23,6 +24,7 @@ class _SaleDetailViewState extends State<SaleDetailView> {
     super.initState();
     _loadSaleDetail();
   }
+
 
   Future<void> _loadSaleDetail() async {
     try {
@@ -114,7 +116,7 @@ class _SaleDetailViewState extends State<SaleDetailView> {
             icon: const Icon(Icons.print),
             onPressed: () async {
               final controller = context.read<UserController>();
-              await controller.printInvoice(context, sale!);
+              await controller.printInvoice2(context, sale!);
             },
           ),
         ],
@@ -296,8 +298,8 @@ class _SaleDetailViewState extends State<SaleDetailView> {
             // 🔹 Impression
             FilledButton.icon(
               onPressed: () async {
-                final controller = context.read<UserController>();
-                await controller.printInvoice(context, sale!);
+               final controller = context.read<UserController>();
+                await controller.printInvoice2(context, sale!);
               },
               icon: const Icon(Icons.print),
               label: const Text('Imprimer la facture'),

@@ -135,6 +135,9 @@ class _LoginViewState extends State<LoginView> {
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16),
                     child: TextFormField(
+                      style: TextStyle(
+                        color: Colors.black,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Email',
                         labelStyle: TextStyle(
@@ -177,6 +180,9 @@ class _LoginViewState extends State<LoginView> {
                     child: TextFormField(
                       controller: _passwordCtrl,
                       obscureText: true,
+                      style: TextStyle(
+                        color: Colors.black,
+                      ),
                       decoration: InputDecoration(
                         labelText: 'Mot de passe',
                         labelStyle: TextStyle(

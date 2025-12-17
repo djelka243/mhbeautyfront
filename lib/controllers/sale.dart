@@ -80,17 +80,39 @@ class SaleController extends ChangeNotifier {
 
    Future<void> fetchSalesHistory() async {
     try {
-      final url = Uri.parse('${UserController.apiBaseUrl}/sales');
-      final resp = await http.get(url, headers: getAuthHeaders());
-      debugPrint(
-        'fetchSalesHistory response -> status: ${resp.statusCode}, body: ${resp.body}',
-      );
-      if (resp.statusCode == 200) {
-        final js = jsonDecode(resp.body);
-        sales = _listFromJson(js['data']);
-      } else {
-        // Gérer les erreurs
+      // Récupérer toutes les ventes avec pagination
+      final allSales = <Map<String, dynamic>>[];
+      int page = 1;
+      int perPage = 100; // Récupérer 100 ventes par page
+      bool hasMore = true;
+
+      while (hasMore) {
+        final url = Uri.parse(
+          '${UserController.apiBaseUrl}/sales?page=$page&per_page=$perPage',
+        );
+        final resp = await http.get(url, headers: getAuthHeaders());
+        debugPrint(
+          'fetchSalesHistory response -> page: $page, status: ${resp.statusCode}',
+        );
+
+        if (resp.statusCode == 200) {
+          final js = jsonDecode(resp.body);
+          final pageData = _listFromJson(js['data']);
+
+          if (pageData.isEmpty) {
+            hasMore = false;
+          } else {
+            allSales.addAll(pageData);
+            page++;
+          }
+        } else {
+          // Gérer les erreurs
+          hasMore = false;
+        }
       }
+
+      sales = allSales;
+      debugPrint('fetchSalesHistory total sales: ${sales.length}');
     } catch (e) {
       debugPrint('fetchSalesHistory exception: $e');
     }
@@ -123,7 +145,7 @@ class SaleController extends ChangeNotifier {
           'id': sale['id'],
           'invoice_number': sale['invoice_number'],
           'client': sale['customer_name'] ?? 'Client inconnu',
-          'phone': sale['customer_phone'] ?? 'Non renseigné',
+          'phone': sale['customer_phone'] ?? '-',
           'amount': parseDouble(sale['amount_given']),
           'currency': sale['payment_currency'],
           'exchange': parseDouble(sale['exchange_rate']),

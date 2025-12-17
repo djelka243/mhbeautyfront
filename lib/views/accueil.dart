@@ -159,6 +159,7 @@ class _HomeViewState extends State<HomeView> {
               ),
             if (isAdmin)
               const SizedBox(height: 8),
+            if (isAdmin)
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.category_outlined),
@@ -169,6 +170,7 @@ class _HomeViewState extends State<HomeView> {
               ),
             if (isAdmin)
               const SizedBox(height: 8),
+            if (isAdmin)
               Card(
                 child: ListTile(
                   leading: const Icon(Icons.money_off),
