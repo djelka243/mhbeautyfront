@@ -68,11 +68,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/sales/history',
-        builder: (context, state) => ChangeNotifierProvider(
-          create: (context) => SaleController(),
-          child: const SalesHistoryView(),
-        ),
-      //  builder: (context, state) => const SalesHistoryView(),
+        builder: (context, state) => const SalesHistoryView(),
       ),
       GoRoute(
         path: '/sales/:id',

@@ -18,8 +18,7 @@ class UserController extends ChangeNotifier {
 	static const String _userKey = 'user';
 	static const String _darkModeKey = 'dark_mode';
 
-	static const String apiBaseUrl = 'http://mhbeautyprod.eu-north-1.elasticbeanstalk.com/api/v1';
-	//static const String apiBaseUrl = 'http://192.168.11.101:8000/api/v1';
+	static const String apiBaseUrl = 'https://mhbeauty.online/api/v1';
 
 	// État interne
 	String? _token;

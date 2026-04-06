@@ -45,7 +45,7 @@ android {
 
     // Split APKs per ABI to avoid packaging unneeded native libs in a single APK.
     splits {
-      /*  abi {
+      /* abi {
             isEnable = false
             reset()
             include("armeabi-v7a", "arm64-v8a")
